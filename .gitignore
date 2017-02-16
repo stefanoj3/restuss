@@ -1,0 +1,6 @@
+# external packages folder
+vendor/
+.idea
+.DS_Store
+# here you can put any sort of file useful to test the code written
+cmd/
