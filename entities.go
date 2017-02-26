@@ -12,11 +12,11 @@ type PersistedScan struct {
 }
 
 type Vulnerability struct {
-	VulnerabilityIndex int    `json:"vuln_index"`
-	Severity           int    `json:"severity"`
+	VulnerabilityIndex int64  `json:"vuln_index"`
+	Severity           int64  `json:"severity"`
 	PluginName         string `json:"plugin_name"`
-	Count              int    `json:"count"`
-	PluginId           int    `json:"plugin_id"`
+	Count              int64  `json:"count"`
+	PluginId           int64  `json:"plugin_id"`
 	PluginFamily       string `json:"plugin_family"`
 }
 
@@ -45,4 +45,16 @@ type ScanTemplate struct {
 	SubscriptionOnly bool   `json:"subscription_only"`
 	IsAgent          bool   `json:"is_agent"`
 	Info             string `json:"more_info"`
+}
+
+type PluginAttribute struct {
+	Name  string `json:"attribute_name"`
+	Value string `json:"attribute_value"`
+}
+
+type Plugin struct {
+	ID         int64             `json:"id"`
+	Name       string            `json:"name"`
+	FamilyName string            `json:"family_name"`
+	Attributes []PluginAttribute `json:"attributes"`
 }
