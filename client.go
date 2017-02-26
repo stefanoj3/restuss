@@ -17,6 +17,7 @@ type Client interface {
 	CreateScan(scan *Scan) (*PersistedScan, error)
 	GetScans(lastModificationDate int64) ([]*PersistedScan, error)
 	GetScanByID(id int64) (*ScanDetail, error)
+	GetPluginById(id int64) (*Plugin, error)
 }
 
 type client struct {
@@ -26,7 +27,7 @@ type client struct {
 }
 
 func (c *client) GetScanTemplates() ([]*ScanTemplate, error) {
-	req, err := http.NewRequest("GET", c.url+"/editor/scan/templates", nil)
+	req, err := http.NewRequest(http.MethodGet, c.url+"/editor/scan/templates", nil)
 
 	if err != nil {
 		return nil, errors.New("Unable to create request object: " + err.Error())
@@ -46,8 +47,8 @@ func (c *client) GetScanTemplates() ([]*ScanTemplate, error) {
 }
 
 func (c *client) LaunchScan(scanId int64) error {
-	url := c.url + "/scans/" + strconv.FormatInt(scanId, 10) + "/launch"
-	req, err := http.NewRequest("POST", url, nil)
+	path := "/scans/" + strconv.FormatInt(scanId, 10) + "/launch"
+	req, err := http.NewRequest(http.MethodPost, c.url+path, nil)
 
 	if err != nil {
 		return errors.New("Unable to create request object: " + err.Error())
@@ -63,8 +64,8 @@ func (c *client) LaunchScan(scanId int64) error {
 }
 
 func (c *client) StopScan(scanId int64) error {
-	url := c.url + "/scans/" + strconv.FormatInt(scanId, 10) + "/stop"
-	req, err := http.NewRequest("POST", url, nil)
+	path := "/scans/" + strconv.FormatInt(scanId, 10) + "/stop"
+	req, err := http.NewRequest(http.MethodPost, c.url+path, nil)
 
 	if err != nil {
 		return errors.New("Unable to create request object: " + err.Error())
@@ -86,7 +87,7 @@ func (c *client) CreateScan(scan *Scan) (*PersistedScan, error) {
 		return nil, errors.New("Unable to marshall request body" + err.Error())
 	}
 
-	req, err := http.NewRequest("POST", c.url+"/scans", bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest(http.MethodPost, c.url+"/scans", bytes.NewBuffer(jsonBody))
 	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
@@ -107,7 +108,7 @@ func (c *client) CreateScan(scan *Scan) (*PersistedScan, error) {
 }
 
 func (c *client) GetScans(lastModificationDate int64) ([]*PersistedScan, error) {
-	req, err := http.NewRequest("GET", c.url+"/scans", nil)
+	req, err := http.NewRequest(http.MethodGet, c.url+"/scans", nil)
 
 	if err != nil {
 		return nil, errors.New("Unable to create request object: " + err.Error())
@@ -135,7 +136,7 @@ func (c *client) GetScans(lastModificationDate int64) ([]*PersistedScan, error) 
 func (c *client) GetScanByID(id int64) (*ScanDetail, error) {
 	path := fmt.Sprintf("/scans/%d", id)
 
-	req, err := http.NewRequest("GET", c.url+path, nil)
+	req, err := http.NewRequest(http.MethodGet, c.url+path, nil)
 
 	if err != nil {
 		return nil, errors.New("Unable to create request object: " + err.Error())
@@ -152,6 +153,25 @@ func (c *client) GetScanByID(id int64) (*ScanDetail, error) {
 	scanDetail.ID = id
 
 	return scanDetail, nil
+}
+
+func (c *client) GetPluginById(id int64) (*Plugin, error) {
+	path := fmt.Sprintf("/plugins/plugin/%d", id)
+	req, err := http.NewRequest(http.MethodGet, c.url+path, nil)
+
+	if err != nil {
+		return nil, errors.New("Unable to create request object: " + err.Error())
+	}
+
+	p := &Plugin{}
+
+	err = c.performCallAndReadResponse(req, p)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 func (c *client) performCallAndReadResponse(req *http.Request, data interface{}) error {
