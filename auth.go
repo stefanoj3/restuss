@@ -5,47 +5,57 @@ import (
 	"net/http"
 )
 
+// AuthProvider expose the methods necessary to perform authenticated calls
 type AuthProvider interface {
 	AddAuthHeaders(*http.Request)
 	Prepare(url string, client *http.Client) error
 }
 
-type basicAuthProvider struct {
+// BasicAuthProvider represent the basic auth method
+type BasicAuthProvider struct {
 	username string
 	password string
 	token    string
 }
 
-func (b *basicAuthProvider) AddAuthHeaders(r *http.Request) {
+// NewBasicAuthProvider returns a new BasicAuthProvider
+func NewBasicAuthProvider(username string, password string) *BasicAuthProvider {
+	return &BasicAuthProvider{username: username, password: password}
+}
+
+// AddAuthHeaders add auth headers
+func (b *BasicAuthProvider) AddAuthHeaders(r *http.Request) {
 	panic("not supported yet")
 }
-func (b *basicAuthProvider) Prepare(url string, c *http.Client) error {
-	//todo perform api request and het the token -> b.token
+
+// Prepare performs tasks required pre-auth, it should be called before AddAuthHeaders can be used
+func (b *BasicAuthProvider) Prepare(url string, c *http.Client) error {
+	//todo perform api request and get the token -> b.token
 	//todo then use the token in addAuthHeaders
 	panic("not supported yet")
 	return nil
 }
 
-func NewBasicAuthProvider(username string, password string) AuthProvider {
-	return &basicAuthProvider{username: username, password: password}
-}
-
-type keyAuthProvider struct {
+// KeyAuthProvider represent the key based auth method
+type KeyAuthProvider struct {
 	accessKey string
 	secretKey string
 }
 
-func (k *keyAuthProvider) Prepare(_ string, _ *http.Client) error {
+// NewKeyAuthProvider returns a new KeyAuthProvider
+func NewKeyAuthProvider(accessKey string, secretKey string) *KeyAuthProvider {
+	return &KeyAuthProvider{accessKey: accessKey, secretKey: secretKey}
+}
+
+// Prepare performs tasks required pre-auth, it should be called before AddAuthHeaders can be used
+func (k *KeyAuthProvider) Prepare(_ string, _ *http.Client) error {
 	return nil
 }
 
-func (k *keyAuthProvider) AddAuthHeaders(r *http.Request) {
+// AddAuthHeaders add auth headers
+func (k *KeyAuthProvider) AddAuthHeaders(r *http.Request) {
 	r.Header.Add(
 		"X-ApiKeys",
 		fmt.Sprintf("accessKey=%s; secretKey=%s", k.accessKey, k.secretKey),
 	)
-}
-
-func NewKeyAuthProvider(accessKey string, secretKey string) AuthProvider {
-	return &keyAuthProvider{accessKey: accessKey, secretKey: secretKey}
 }

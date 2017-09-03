@@ -10,6 +10,7 @@ import (
 	"strconv"
 )
 
+// Client expose the methods callable on Nessus Api
 type Client interface {
 	GetScanTemplates() ([]*ScanTemplate, error)
 	LaunchScan(scanId int64) error
@@ -17,16 +18,38 @@ type Client interface {
 	CreateScan(scan *Scan) (*PersistedScan, error)
 	GetScans(lastModificationDate int64) ([]*PersistedScan, error)
 	GetScanByID(id int64) (*ScanDetail, error)
-	GetPluginById(id int64) (*Plugin, error)
+	GetPluginByID(id int64) (*Plugin, error)
 }
 
-type client struct {
+type NessusClient struct {
 	auth       AuthProvider
 	url        string
 	httpClient *http.Client
 }
 
-func (c *client) GetScanTemplates() ([]*ScanTemplate, error) {
+// NewClient returns a new NessusClient
+func NewClient(auth AuthProvider, url string, allowInsecureConnection bool) (*NessusClient, error) {
+	var c *http.Client
+
+	if allowInsecureConnection {
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		c = &http.Client{Transport: tr}
+	} else {
+		c = &http.Client{}
+	}
+
+	err := auth.Prepare(url, c)
+	if err != nil {
+		return nil, errors.New("Failed to prepare auth provider: " + err.Error())
+	}
+
+	return &NessusClient{auth: auth, url: url, httpClient: c}, nil
+}
+
+// GetScanTemplates retrieves Scan Templates
+func (c *NessusClient) GetScanTemplates() ([]*ScanTemplate, error) {
 	req, err := http.NewRequest(http.MethodGet, c.url+"/editor/scan/templates", nil)
 
 	if err != nil {
@@ -38,7 +61,6 @@ func (c *client) GetScanTemplates() ([]*ScanTemplate, error) {
 	}
 
 	err = c.performCallAndReadResponse(req, &data)
-
 	if err != nil {
 		return nil, errors.New("Call failed: " + err.Error())
 	}
@@ -46,8 +68,9 @@ func (c *client) GetScanTemplates() ([]*ScanTemplate, error) {
 	return data.Templates, nil
 }
 
-func (c *client) LaunchScan(scanId int64) error {
-	path := "/scans/" + strconv.FormatInt(scanId, 10) + "/launch"
+// LaunchScan launch spe scan with the specified scanID
+func (c *NessusClient) LaunchScan(scanID int64) error {
+	path := "/scans/" + strconv.FormatInt(scanID, 10) + "/launch"
 	req, err := http.NewRequest(http.MethodPost, c.url+path, nil)
 
 	if err != nil {
@@ -63,8 +86,9 @@ func (c *client) LaunchScan(scanId int64) error {
 	return nil
 }
 
-func (c *client) StopScan(scanId int64) error {
-	path := "/scans/" + strconv.FormatInt(scanId, 10) + "/stop"
+// StopScan stops the scan with the given scanID
+func (c *NessusClient) StopScan(scanID int64) error {
+	path := "/scans/" + strconv.FormatInt(scanID, 10) + "/stop"
 	req, err := http.NewRequest(http.MethodPost, c.url+path, nil)
 
 	if err != nil {
@@ -72,7 +96,6 @@ func (c *client) StopScan(scanId int64) error {
 	}
 
 	err = c.performCallAndReadResponse(req, nil)
-
 	if err != nil {
 		return err
 	}
@@ -80,26 +103,25 @@ func (c *client) StopScan(scanId int64) error {
 	return nil
 }
 
-func (c *client) CreateScan(scan *Scan) (*PersistedScan, error) {
+// CreateScan creates a scan
+func (c *NessusClient) CreateScan(scan *Scan) (*PersistedScan, error) {
 	jsonBody, err := json.Marshal(scan)
-
 	if err != nil {
 		return nil, errors.New("Unable to marshall request body" + err.Error())
 	}
 
 	req, err := http.NewRequest(http.MethodPost, c.url+"/scans", bytes.NewBuffer(jsonBody))
-	req.Header.Set("Content-Type", "application/json")
-
 	if err != nil {
 		return nil, errors.New("Unable to create request object: " + err.Error())
 	}
+
+	req.Header.Set("Content-Type", "application/json")
 
 	var result struct {
 		Scan PersistedScan `json:"scan"`
 	}
 
 	err = c.performCallAndReadResponse(req, &result)
-
 	if err != nil {
 		return nil, err
 	}
@@ -107,9 +129,9 @@ func (c *client) CreateScan(scan *Scan) (*PersistedScan, error) {
 	return &result.Scan, nil
 }
 
-func (c *client) GetScans(lastModificationDate int64) ([]*PersistedScan, error) {
+// GetScans get a list of scan matching the provided lastModificationDate (check Nessus documentation)
+func (c *NessusClient) GetScans(lastModificationDate int64) ([]*PersistedScan, error) {
 	req, err := http.NewRequest(http.MethodGet, c.url+"/scans", nil)
-
 	if err != nil {
 		return nil, errors.New("Unable to create request object: " + err.Error())
 	}
@@ -125,7 +147,6 @@ func (c *client) GetScans(lastModificationDate int64) ([]*PersistedScan, error) 
 	}
 
 	err = c.performCallAndReadResponse(req, &data)
-
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +154,11 @@ func (c *client) GetScans(lastModificationDate int64) ([]*PersistedScan, error) 
 	return data.Scans, nil
 }
 
-func (c *client) GetScanByID(id int64) (*ScanDetail, error) {
-	path := fmt.Sprintf("/scans/%d", id)
+// GetScanByID retrieve a scan by ID
+func (c *NessusClient) GetScanByID(ID int64) (*ScanDetail, error) {
+	path := fmt.Sprintf("/scans/%d", ID)
 
 	req, err := http.NewRequest(http.MethodGet, c.url+path, nil)
-
 	if err != nil {
 		return nil, errors.New("Unable to create request object: " + err.Error())
 	}
@@ -145,20 +166,20 @@ func (c *client) GetScanByID(id int64) (*ScanDetail, error) {
 	scanDetail := &ScanDetail{}
 
 	err = c.performCallAndReadResponse(req, &scanDetail)
-
 	if err != nil {
 		return nil, err
 	}
 
-	scanDetail.ID = id
+	scanDetail.ID = ID
 
 	return scanDetail, nil
 }
 
-func (c *client) GetPluginById(id int64) (*Plugin, error) {
-	path := fmt.Sprintf("/plugins/plugin/%d", id)
-	req, err := http.NewRequest(http.MethodGet, c.url+path, nil)
+// GetPluginByID retrieves a plugin by ID
+func (c *NessusClient) GetPluginByID(ID int64) (*Plugin, error) {
+	path := fmt.Sprintf("/plugins/plugin/%d", ID)
 
+	req, err := http.NewRequest(http.MethodGet, c.url+path, nil)
 	if err != nil {
 		return nil, errors.New("Unable to create request object: " + err.Error())
 	}
@@ -166,7 +187,6 @@ func (c *client) GetPluginById(id int64) (*Plugin, error) {
 	p := &Plugin{}
 
 	err = c.performCallAndReadResponse(req, p)
-
 	if err != nil {
 		return nil, err
 	}
@@ -174,11 +194,10 @@ func (c *client) GetPluginById(id int64) (*Plugin, error) {
 	return p, nil
 }
 
-func (c *client) performCallAndReadResponse(req *http.Request, data interface{}) error {
+func (c *NessusClient) performCallAndReadResponse(req *http.Request, data interface{}) error {
 	c.auth.AddAuthHeaders(req)
 
 	res, err := c.httpClient.Do(req)
-
 	if err != nil {
 		return errors.New("Failed call: " + err.Error())
 	}
@@ -191,33 +210,12 @@ func (c *client) performCallAndReadResponse(req *http.Request, data interface{})
 
 	if data != nil {
 		d := json.NewDecoder(res.Body)
-		err = d.Decode(&data)
 
+		err = d.Decode(&data)
 		if err != nil {
 			return errors.New("Failed to read the response: " + err.Error())
 		}
 	}
 
 	return nil
-}
-
-func NewClient(auth AuthProvider, url string, allowInsecureConnection bool) (Client, error) {
-	var c *http.Client
-
-	if allowInsecureConnection {
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		c = &http.Client{Transport: tr}
-	} else {
-		c = &http.Client{}
-	}
-
-	err := auth.Prepare(url, c)
-
-	if err != nil {
-		return nil, errors.New("Failed to prepare auth provider: " + err.Error())
-	}
-
-	return &client{auth: auth, url: url, httpClient: c}, nil
 }
